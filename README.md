@@ -1,18 +1,23 @@
-# FGSMH Metrix-Laskuri
+# FGSMH Metrix-Laskuri 🏆
 
-Työkalu Frisbeegolfseura Mulligan Hooligans ry:n viikkokisojen pistelaskuun.
+Automaattinen pistelaskuri **Frisbeegolfseura Mulligan Hooligans ry**:n viikkokisoihin. Ohjelma hakee tiedot suoraan Discgolf Metrixin rajapinnasta ja laskee sarjapisteet seuran sääntöjen mukaan.
 
 Tuomas Virtanen 2026-03-27
 
-## Käyttöönotto ja käyttö
-1. Asenna [uv](https://docs.astral.sh/uv/)
-2. Aja asennus: `uv sync`
-3. Komento ```python -m uv run metrix_fgsmh.py``` 
-4. Syötä viikkokisakauden numero
-5. Nauti
+## Pistelaskusäännöt
+1. **Sijoituspisteet**: Lasketaan kaavalla `(Osallistujat - Sija)`.
+2. **Tasatulokset**: Jaetut sijat saavat molemmat parhaan sijoituksen mukaiset pisteet.
+3. **8 Parasta**: Lopulliseen summaan huomioidaan vain pelaajan 8 parasta sijoituspistesuoritusta.
+4. **Osallistumisbonus**: Jokaisesta pelatusta kierroksesta saa +1 pisteen, joka lisätään loppusummaan.
 
-## Käyttö
-Aja laskuri komennolla:
-```powershell
+## Käyttöönotto
+Varmista, että koneellasi on [uv](https://docs.astral.sh/uv/) asennettuna.
+
+```bash
+# Kloonaa repo
+git clone git@github.com:tuomastvirtanen/fgsmh_metrix.git
+cd fgsmh_metrix
+
+# Aja ohjelma (uv asentaa riippuvuudet automaattisesti)
 uv run metrix_laskuri.py
-``` 
+```
