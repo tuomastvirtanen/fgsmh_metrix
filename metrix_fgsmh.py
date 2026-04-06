@@ -18,17 +18,11 @@ def nayta_logo():
     | $$      |  $$$$$$/|  $$$$$$/| $$ \/  | $$| $$  | $$
     |__/       \______/  \______/ |__/     |__/|__/  |__/
     """)
-    print("=" * 65)
-    print("     M E T R I X   P I S T E L A S K U R I ")
-    print("=" * 65)
-    print("     Säännöt:")
-    print("     1. Sijoituspisteet: (Osallistujat - Sija)")
-    print("     2. Jaetut sijat: Molemmat saavat parhaan sijoituksen pisteet")
-    print("     3. Sarjapisteet: 8 parasta sijoituspiste-kierrosta")
-    print("     4. Osallistumisbonus: +1p per startti loppusummaan")
-    print(" ")
-    print("     Tuomas Virtanen 2026-03-27")
-    print("-" * 65)
+    print("=" * 75)
+    print("     M E T R I X   P I S T E L A S K U R I   (v2026.04.06)")
+    print("=" * 75)
+    print("     Säännöt: (N-Sija) + 1p osallistuminen. Max 8 parasta kisaa.")
+    print("-" * 75)
 
 
 def hae_metrix_data(kilpailu_id):
@@ -45,41 +39,30 @@ def hae_metrix_data(kilpailu_id):
 
 
 def parsi_yksittainen_kisa_sarjamuotoon(comp):
-    """Muuntaa yksittäisen kisan datan sarjamuotoon, jotta muu koodi ei hajoa."""
+    """Muuntaa yksittäisen kisan datan sarjamuotoon."""
     kisan_nimi = html.unescape(comp.get("Name", "Yksittäinen kisa"))
-    # kisan_nimi = comp.get("Name", "Yksittäinen kisa")
     results = comp.get("Results", [])
-
-    # Tehdään valekilpailulista (Events), jossa on vain tämä yksi kisa
     event_names = [kisan_nimi]
-
     rows = []
     for player in results:
-        # Metrixin yksittäisessä kisassa tulos on 'Sum', sarjakisassa se on listassa
         row = {
             "UserID": str(player.get("UserID", "")),
             "Nimi": player.get("Name", "Tuntematon"),
             "Maa": player.get("CountryCode", "FI"),
-            kisan_nimi: player.get(
-                "Sum"
-            ),  # Laitetaan tulos sarakkeeseen, jonka nimi on kisan nimi
+            kisan_nimi: player.get("Sum"),
         }
         rows.append(row)
-
     return pd.DataFrame(rows), event_names, kisan_nimi
 
 
 def parsi_perustulokset(json_data):
     """Parsii JSON-datan ja tunnistaa onko kyseessä sarja vai yksittäinen kisa."""
     comp = json_data.get("Competition", {})
-
-    # TUNNISTUS: Jos löytyy TourResults, se on sarja. Jos ei, se on yksittäinen kisa.
     if "TourResults" in comp:
         print("📊 Tunnistettu: Sarjakilpailu / Liiga")
         events = comp.get("Events", [])
-        event_names = [e["Name"] for e in events]
+        event_names = [html.unescape(e["Name"]) for e in events]
         tour_results = comp.get("TourResults", [])
-
         rows = []
         for player in tour_results:
             row = {
@@ -89,12 +72,10 @@ def parsi_perustulokset(json_data):
             }
             results = player["EventResults"]
             for i, name in enumerate(event_names):
-                val = results[i] if i < len(results) else None
-                row[name] = val
+                row[name] = results[i] if i < len(results) else None
             rows.append(row)
         kisan_nimi = html.unescape(comp.get("Name", "Kisa"))
         return pd.DataFrame(rows), event_names, kisan_nimi
-
     else:
         print("🎯 Tunnistettu: Yksittäinen kilpailu")
         return parsi_yksittainen_kisa_sarjamuotoon(comp)
@@ -105,7 +86,6 @@ def laske_sarjapisteet(df, event_columns, max_events=8):
     rank_points_df = pd.DataFrame(index=df.index)
     participation_count = pd.Series(0, index=df.index)
 
-    print("🧮 Lasketaan kierroskohtaisia sijoituspisteitä...")
     for event in event_columns:
         scores = pd.to_numeric(df[event], errors="coerce")
         valid_mask = scores.notna()
@@ -117,12 +97,10 @@ def laske_sarjapisteet(df, event_columns, max_events=8):
 
         N = len(participated_scores)
         ranks = participated_scores.rank(method="min", ascending=True)
-
         event_rank_points = N - ranks
 
         rank_points_df.loc[valid_mask, event] = event_rank_points
         rank_points_df.loc[~valid_mask, event] = 0.0
-
         participation_count[valid_mask] += 1
 
     top_8_rank_sum = rank_points_df[event_columns].apply(
@@ -130,63 +108,65 @@ def laske_sarjapisteet(df, event_columns, max_events=8):
     )
 
     results = df[["UserID", "Nimi"]].copy()
+
+    # LISÄYS: Lisätään osakilpailukohtaiset pisteet sarakkeiksi Exceliä varten
     for event in event_columns:
-        results[event] = rank_points_df[event]
+        results[f"Pisteet: {event}"] = rank_points_df[event]
 
     results["Sijoituspisteet_8_parasta"] = top_8_rank_sum
     results["Osallistumiset_yht"] = participation_count
     results["Kokonaispisteet"] = top_8_rank_sum + participation_count
-
-    # Lasketaan sijoitus kokonaispisteiden perusteella
     results["Sarjasijoitus"] = (
         results["Kokonaispisteet"].rank(method="min", ascending=False).astype(int)
     )
 
-    return results.sort_values(by="Kokonaispisteet", ascending=False)
+    return results.sort_values(by="Kokonaispisteet", ascending=False), rank_points_df
 
 
 def main():
     nayta_logo()
-
-    kisa_id = input("Syötä Metrix Competition ID (esim. 3519469): ").strip()
+    kisa_id = input("Syötä Metrix Competition ID: ").strip()
     if not kisa_id:
-        print("❌ ID vaaditaan.")
         return
 
     json_data = hae_metrix_data(kisa_id)
-
-    if not json_data or "Competition" not in json_data:
-        print("❌ Dataa ei saatu. Tarkista ID.")
+    if not json_data:
         return
 
     df_tulokset, event_names, kisan_nimi = parsi_perustulokset(json_data)
-    df_sarjataulukko = laske_sarjapisteet(df_tulokset, event_names, max_events=8)
+    df_sarjataulukko, df_rank_only = laske_sarjapisteet(df_tulokset, event_names)
 
     tiedostonimi = f"FGSMH_Sarjataulukko_{kisa_id}.xlsx"
-    print(f"📁 Tallennetaan: {tiedostonimi}...")
-
     try:
         with pd.ExcelWriter(tiedostonimi, engine="openpyxl") as writer:
             df_sarjataulukko.to_excel(writer, sheet_name="Sarjapisteet", index=False)
             df_tulokset.to_excel(writer, sheet_name="Heitetyt_Tulokset", index=False)
 
-        print("\n✅ VALMIS!")
-
-        # Tulostetaan tekstimuotoinen kooste terminaaliin
+        # TERMINAALITULOSTUS
         print(f"\nSARJATAULUKKO: {kisan_nimi}")
-        print("-" * 65)
-        print(f"{'SIJA':<6} {'PELAAJA':<25} {'KISAT':<8} {'PISTEET':<10}")
-        print("-" * 65)
 
-        # Tulostetaan Top 30 (tai kaikki jos vähemmän)
+        # Dynaaminen otsikko: K1, K2... osakilpailuille
+        header = f"{'SIJA':<5} {'PELAAJA':<20}"
+        for i in range(len(event_names)):
+            header += f"{'K' + str(i + 1):>4}"
+        header += f" {'LKM':>4} {'YHT':>5}"
+
+        print("-" * len(header))
+        print(header)
+        print("-" * len(header))
+
         for _, row in df_sarjataulukko.head(30).iterrows():
-            print(
-                f"{row['Sarjasijoitus']:<6} {row['Nimi']:<25} {int(row['Osallistumiset_yht']):<8} {row['Kokonaispisteet']:<10.0f}"
+            line = f"{row['Sarjasijoitus']:<5} {row['Nimi'][:20]:<20}"
+            for event in event_names:
+                p = row[f"Pisteet: {event}"]
+                line += f"{int(p):>4}" if p > 0 else f"{'-':>4}"
+            line += (
+                f" {int(row['Osallistumiset_yht']):>4} {int(row['Kokonaispisteet']):>5}"
             )
+            print(line)
 
-        if len(df_sarjataulukko) > 30:
-            print(f"...ja {len(df_sarjataulukko) - 30} muuta pelaajaa.")
-        print("-" * 65)
+        print("-" * len(header))
+        print(f"✅ Tallennettu: {tiedostonimi}")
 
     except Exception as e:
         print(f"❌ Virhe tallennuksessa: {e}")
