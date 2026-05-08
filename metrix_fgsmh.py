@@ -43,9 +43,11 @@ def parsi_yksittainen_kisa(comp):
     event_names = [kisan_nimi]
     rows = []
     for player in results:
+        # Varmistetaan ID, vaikka UserID puuttuisi
+        u_id = str(player.get("UserID") or player.get("RegistrationID") or "0")
         row = {
-            "UserID": str(player.get("UserID") or player.get("RegistrationID", "0")),
-            "Nimi": player.get("Name") or player.get("Nimi", "Tuntematon"),
+            "UserID": u_id,
+            "Nimi": player.get("Name") or player.get("Nimi") or "Tuntematon",
             "Maa": player.get("CountryCode", "FI"),
             kisan_nimi: player.get("Sum"),
         }
@@ -156,13 +158,22 @@ def main():
         print(header)
         print("-" * len(header))
         
-        for _, row in df_sarjataulukko.head(30).iterrows():
+        for _, row in df_sarjataulukko.iterrows():
             line = f"{row['Sarjasijoitus']:<5} {row['Nimi'][:20]:<20}"
             for event in event_names:
                 p = row[f"Pisteet: {event}"]
-                line += f"{int(p):>4}" if p > 0 else f"{'-':>4}"
+                # Tarkistetaan alkuperäisestä datasta, osallistuiko pelaaja
+                # Jos tulos on olemassa (ei NaN), näytetään pisteet (myös 0)
+                original_score = df_tulokset.loc[df_tulokset['UserID'] == row['UserID'], event].values[0]
+                
+                if pd.notna(original_score):
+                    line += f"{int(p):>4}"
+                else:
+                    line += f"{'-':>4}"
+            
             line += f" {int(row['Osallistumiset_yht']):>4} {int(row['Kokonaispisteet']):>5}"
             print(line)
+
         print("-" * len(header))
         
     except Exception as e:
