@@ -82,6 +82,7 @@ def parsi_perustulokset(json_data):
         print("🎯 Tunnistettu: Yksittäinen kilpailu")
         return parsi_yksittainen_kisa(comp)
 
+# ...existing code...
 def laske_sarjapisteet(df, event_columns, max_events=8):
     """Laskee sijoituspisteet ja osallistumisbonukset."""
     rank_points_df = pd.DataFrame(index=df.index)
@@ -123,6 +124,43 @@ def laske_sarjapisteet(df, event_columns, max_events=8):
     
     return results.sort_values(by='Kokonaispisteet', ascending=False)
 
+def laske_G_style_pisteet(df, event_columns, max_events=8):
+    """Laskee pisteet Google Sheets -kaavan mukaisesti:
+    ROUND((100 * (N - RANK + 1) / N) + 1) per tapahtuma, summaa 8 parasta + osallistumiset.
+    """
+    rank_points_df = pd.DataFrame(index=df.index)
+    participation_count = pd.Series(0, index=df.index)
+
+    print("🔢 Lasketaan Google Sheets -tyylisiä pisteitä...")
+    for event in event_columns:
+        scores = pd.to_numeric(df[event], errors='coerce')
+        valid_mask = scores.notna()
+        participated_scores = scores[valid_mask]
+
+        if participated_scores.empty:
+            rank_points_df[event] = 0.0
+            continue
+
+        N = len(participated_scores)
+        ranks = participated_scores.rank(method='min', ascending=True)  # 1 = paras
+        points = ((100 * (N - ranks + 1) / N) + 1).round()  # vastaava kaava
+        # Täytetään tulosframe
+        rank_points_df.loc[valid_mask, event] = points
+        rank_points_df.loc[~valid_mask, event] = 0.0
+        participation_count[valid_mask] += 1
+
+    top_8_sum = rank_points_df[event_columns].apply(lambda row: row.nlargest(max_events).sum(), axis=1)
+
+    results = df[['UserID', 'Nimi']].copy()
+    for event in event_columns:
+        results[f"GooglePisteet: {event}"] = rank_points_df[event]
+    results['G_Sijoituspisteet_8_parasta'] = top_8_sum
+    results['Osallistumiset_yht'] = participation_count
+    results['G_Kokonaispisteet'] = top_8_sum + participation_count
+    results['G_SarjaSijoitus'] = results['G_Kokonaispisteet'].rank(method='min', ascending=False).astype(int)
+
+    return results.sort_values(by='G_Kokonaispisteet', ascending=False)
+
 def main():
     nayta_logo()
     kisa_id = input("Syötä Metrix Competition ID: ").strip()
@@ -136,12 +174,14 @@ def main():
 
     df_tulokset, event_names, kisan_nimi = parsi_perustulokset(json_data)
     df_sarjataulukko = laske_sarjapisteet(df_tulokset, event_names)
+    df_uusi = laske_G_style_pisteet(df_tulokset, event_names)
 
     tiedostonimi = f"FGSMH_Sarjataulukko_{kisa_id}.xlsx"
     try:
         with pd.ExcelWriter(tiedostonimi, engine='openpyxl') as writer:
             df_sarjataulukko.to_excel(writer, sheet_name='Sarjapisteet', index=False)
             df_tulokset.to_excel(writer, sheet_name='Heitetyt_Tulokset', index=False)
+            df_uusi.to_excel(writer, sheet_name='uusi_Pisteet', index=False)
         
         print(f"\n✅ Tallennettu: {tiedostonimi}")
         
