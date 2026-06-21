@@ -17,7 +17,7 @@ Ohjelma tukee kahta rinnakkaista pistelaskujärjestelmää. Lopullisissa tulosta
 ### Uusi pistelaskumalli (101-1)
 * **Sijoituspisteet:** Lasketaan prosentuaalisella kaavalla per osakilpailu:
   $$ROUND\left(\frac{100 \times (N - \text{Rank} + 1)}{N} + 1\right)$$
-  *Missä $N$ on osakilpailun osallistujamäärä ja $\text{Rank}$ on pelaajan sijoitus.*
+  *Missä N on osakilpailun osallistujamäärä ja Rank on pelaajan sijoitus.*
 * **Tasatulokset:** Jaetut sijat saavat parhaan sijoituksen mukaiset pisteet (vastaava sijoituslogiikka kuin vanhassa mallissa).
 * **8 Parasta:** Lopulliseen pistepottiin huomioidaan vain pelaajan 8 parasta osakilpailusuoritusta.
 * **Osallistumisbonus:** Jokaisesta pelatusta kierroksesta saa +1 pisteen, joka lisätään suoraan loppusummaan.
