@@ -5,10 +5,22 @@ Automaattinen pistelaskuri **Frisbeegolfseura Mulligan Hooligans ry**:n viikkoki
 Tuomas Virtanen 2026-03-27
 
 ## Pistelaskusäännöt
-1. **Sijoituspisteet**: Lasketaan kaavalla `(Osallistujat - Sija)`.
-2. **Tasatulokset**: Jaetut sijat saavat molemmat parhaan sijoituksen mukaiset pisteet.
-3. **8 Parasta**: Lopulliseen summaan huomioidaan vain pelaajan 8 parasta sijoituspistesuoritusta.
-4. **Osallistumisbonus**: Jokaisesta pelatusta kierroksesta saa +1 pisteen, joka lisätään loppusummaan.
+
+Ohjelma tukee kahta rinnakkaista pistelaskujärjestelmää. Lopullisissa tulostaulukoissa huomioidaan molemmat mallit omilla sarakkeillaan.
+
+### Vanha pistelaskumalli
+* **Sijoituspisteet:** Lasketaan kaavalla `Osallistujat - Sija`.
+* **Tasatulokset:** Jaetut sijat saavat molemmat parhaan sijoituksen mukaiset pisteet (esim. jaetulla 2. sijalla molemmat saavat 2. sijan pisteet).
+* **8 Parasta:** Lopulliseen pistepottiin huomioidaan vain pelaajan 8 parasta sijoituspistesuoritusta kauden ajalta.
+* **Osallistumisbonus:** Jokaisesta pelatusta kierroksesta saa +1 pisteen, joka lisätään suoraan loppusummaan.
+
+### Uusi pistelaskumalli (101-1)
+* **Sijoituspisteet:** Lasketaan prosentuaalisella kaavalla per osakilpailu:
+  $$ROUND\left(\frac{100 \times (N - \text{Rank} + 1)}{N} + 1\right)$$
+  *Missä $N$ on osakilpailun osallistujamäärä ja $\text{Rank}$ on pelaajan sijoitus.*
+* **Tasatulokset:** Jaetut sijat saavat parhaan sijoituksen mukaiset pisteet (vastaava sijoituslogiikka kuin vanhassa mallissa).
+* **8 Parasta:** Lopulliseen pistepottiin huomioidaan vain pelaajan 8 parasta osakilpailusuoritusta.
+* **Osallistumisbonus:** Jokaisesta pelatusta kierroksesta saa +1 pisteen, joka lisätään suoraan loppusummaan.
 
 ## Käyttöönotto
 Varmista, että koneellasi on [uv](https://docs.astral.sh/uv/) asennettuna.
