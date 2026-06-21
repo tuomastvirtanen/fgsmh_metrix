@@ -124,14 +124,14 @@ def laske_sarjapisteet(df, event_columns, max_events=8):
     
     return results.sort_values(by='Kokonaispisteet', ascending=False)
 
-def laske_G_style_pisteet(df, event_columns, max_events=8):
-    """Laskee pisteet Google Sheets -kaavan mukaisesti:
+def laske_uudet_pisteet(df, event_columns, max_events=8):
+    """Laskee pisteet uuden kaavan mukaisesti 101-1:
     ROUND((100 * (N - RANK + 1) / N) + 1) per tapahtuma, summaa 8 parasta + osallistumiset.
     """
     rank_points_df = pd.DataFrame(index=df.index)
     participation_count = pd.Series(0, index=df.index)
 
-    print("🔢 Lasketaan Google Sheets -tyylisiä pisteitä...")
+    print("🔢 Lasketaan uuden pistelaskun mukaisia pisteitä...")
     for event in event_columns:
         scores = pd.to_numeric(df[event], errors='coerce')
         valid_mask = scores.notna()
@@ -153,13 +153,13 @@ def laske_G_style_pisteet(df, event_columns, max_events=8):
 
     results = df[['UserID', 'Nimi']].copy()
     for event in event_columns:
-        results[f"GooglePisteet: {event}"] = rank_points_df[event]
-    results['G_Sijoituspisteet_8_parasta'] = top_8_sum
+        results[f"UudetPisteet: {event}"] = rank_points_df[event]
+    results['Sijoituspisteet_8_parasta'] = top_8_sum
     results['Osallistumiset_yht'] = participation_count
-    results['G_Kokonaispisteet'] = top_8_sum + participation_count
-    results['G_SarjaSijoitus'] = results['G_Kokonaispisteet'].rank(method='min', ascending=False).astype(int)
+    results['Kokonaispisteet'] = top_8_sum + participation_count
+    results['SarjaSijoitus'] = results['Kokonaispisteet'].rank(method='min', ascending=False).astype(int)
 
-    return results.sort_values(by='G_Kokonaispisteet', ascending=False)
+    return results.sort_values(by='Kokonaispisteet', ascending=False)
 
 def main():
     nayta_logo()
@@ -174,7 +174,7 @@ def main():
 
     df_tulokset, event_names, kisan_nimi = parsi_perustulokset(json_data)
     df_sarjataulukko = laske_sarjapisteet(df_tulokset, event_names)
-    df_uusi = laske_G_style_pisteet(df_tulokset, event_names)
+    df_uusi = laske_uudet_pisteet(df_tulokset, event_names)
 
     tiedostonimi = f"FGSMH_Sarjataulukko_{kisa_id}.xlsx"
     try:
@@ -185,39 +185,56 @@ def main():
         
         print(f"\n✅ Tallennettu: {tiedostonimi}")
         
-        # TERMINAALITULOSTUS
-        print(f"\nSARJATAULUKKO: {kisan_nimi}")
+        # --- TERMINAALITULOSTUS (PERÄKKÄIN) ---
+        print(f"\nKilpailu: {kisan_nimi}")
         
-        # Dynaaminen otsikko
-        header = f"{'SIJA':<5} {'PELAAJA':<20}"
-        for i in range(len(event_names)):
-            header += f"{'K'+str(i+1):>4}"
-        header += f" {'LKM':>4} {'YHT':>5}"
+        # Luodaan dynaaminen otsikkorivi kisoille (K1, K2, jne.)
+        event_headers = "".join([f"{'K'+str(i+1):>5}" for i in range(len(event_names))])
         
-        print("-" * len(header))
-        print(header)
-        print("-" * len(header))
+        # 1. TAULUKKO: VANHA PISTELASKU
+        v_header = f"{'SIJA':<5} {'PELAAJA':<20} | {event_headers} {'LKM':>4} {'YHT':>5}"
+        print("\n" + "=" * len(v_header))
+        print(f" VANHA PISTELASKU")
+        print("=" * len(v_header))
+        print(v_header)
+        print("-" * len(v_header))
         
         for _, row in df_sarjataulukko.iterrows():
-            line = f"{row['Sarjasijoitus']:<5} {row['Nimi'][:20]:<20}"
+            u_id = row['UserID']
+            line = f"{int(row['Sarjasijoitus']):<5} {row['Nimi'][:20]:<20} | "
             for event in event_names:
-                p = row[f"Pisteet: {event}"]
-                # Tarkistetaan alkuperäisestä datasta, osallistuiko pelaaja
-                # Jos tulos on olemassa (ei NaN), näytetään pisteet (myös 0)
-                original_score = df_tulokset.loc[df_tulokset['UserID'] == row['UserID'], event].values[0]
-                
+                original_score = df_tulokset.loc[df_tulokset['UserID'] == u_id, event].values[0]
                 if pd.notna(original_score):
-                    line += f"{int(p):>4}"
+                    line += f"{int(row[f'Pisteet: {event}']):>5}"
                 else:
-                    line += f"{'-':>4}"
-            
+                    line += f"{'-':>5}"
             line += f" {int(row['Osallistumiset_yht']):>4} {int(row['Kokonaispisteet']):>5}"
             print(line)
+        print("-" * len(v_header))
 
-        print("-" * len(header))
+        # 2. TAULUKKO: UUSI PISTELASKU
+        u_header = f"{'SIJA':<5} {'PELAAJA':<20} | {event_headers} {'LKM':>4} {'YHT':>5}"
+        print("\n" + "=" * len(u_header))
+        print(f" UUSI SÄÄNTÖ (101-1)")
+        print("=" * len(u_header))
+        print(u_header)
+        print("-" * len(u_header))
+        
+        for _, row in df_uusi.iterrows():
+            u_id = row['UserID']
+            line = f"{int(row['SarjaSijoitus']):<5} {row['Nimi'][:20]:<20} | "
+            for event in event_names:
+                original_score = df_tulokset.loc[df_tulokset['UserID'] == u_id, event].values[0]
+                if pd.notna(original_score):
+                    line += f"{int(row[f'UudetPisteet: {event}']):>5}"
+                else:
+                    line += f"{'-':>5}"
+            line += f" {int(row['Osallistumiset_yht']):>4} {int(row['Kokonaispisteet']):>5}"
+            print(line)
+        print("-" * len(u_header))
         
     except Exception as e:
         print(f"❌ Virhe: {e}")
-
+        
 if __name__ == "__main__":
     main()
