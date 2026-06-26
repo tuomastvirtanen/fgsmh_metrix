@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+# Seuran pistelasku
 import html
 import os
 
@@ -178,6 +180,7 @@ def main():
 
     tiedostonimi = f"FGSMH_Sarjataulukko_{kisa_id}.xlsx"
     try:
+        # KORJATTU RIVI TÄSSÄ:
         with pd.ExcelWriter(tiedostonimi, engine='openpyxl') as writer:
             df_sarjataulukko.to_excel(writer, sheet_name='Sarjapisteet', index=False)
             df_tulokset.to_excel(writer, sheet_name='Heitetyt_Tulokset', index=False)
@@ -185,16 +188,20 @@ def main():
         
         print(f"\n✅ Tallennettu: {tiedostonimi}")
         
-        # --- TERMINAALITULOSTUS (PERÄKKÄIN) ---
+        # ANSI-värikoodit terminaaliin
+        GREEN = "\033[92m"  # 8 parasta
+        RED = "\033[91m"    # Huonoin / huonoimmat
+        RESET = "\033[0m"   # Nollaus
+        
+        # --- TERMINAALITULOSTUS (PERÄKKÄIN VÄREILLÄ) ---
         print(f"\nKilpailu: {kisan_nimi}")
         
-        # Luodaan dynaaminen otsikkorivi kisoille (K1, K2, jne.)
         event_headers = "".join([f"{'K'+str(i+1):>5}" for i in range(len(event_names))])
         
         # 1. TAULUKKO: VANHA PISTELASKU
         v_header = f"{'SIJA':<5} {'PELAAJA':<20} | {event_headers} {'LKM':>4} {'YHT':>5}"
         print("\n" + "=" * len(v_header))
-        print(f" VANHA PISTELASKU")
+        print(f" VANHA PISTELASKU  ({GREEN}Vihreä = 8 parasta{RESET} | {RED}Punainen = Huonoin laskettava{RESET})")
         print("=" * len(v_header))
         print(v_header)
         print("-" * len(v_header))
@@ -202,12 +209,34 @@ def main():
         for _, row in df_sarjataulukko.iterrows():
             u_id = row['UserID']
             line = f"{int(row['Sarjasijoitus']):<5} {row['Nimi'][:20]:<20} | "
+            
+            # Kerätään kaikki pelaajan saamat pisteet sanakirjaan
+            event_points = {}
             for event in event_names:
                 original_score = df_tulokset.loc[df_tulokset['UserID'] == u_id, event].values[0]
                 if pd.notna(original_score):
-                    line += f"{int(row[f'Pisteet: {event}']):>5}"
+                    event_points[event] = float(row[f"Pisteet: {event}"])
+            
+            # Tunnistetaan top 8 ja niistä huonoin(huonoimmat)
+            top_8_events = sorted(event_points.items(), key=lambda x: x[1], reverse=True)[:8]
+            top_8_names = [e[0] for e in top_8_events]
+            
+            lowest_top_8_score = min([e[1] for e in top_8_events]) if top_8_events else None
+            
+            for event in event_names:
+                if event in event_points:
+                    p_val = event_points[event]
+                    p_str = f"{int(p_val):>5}"
+                    
+                    if event in top_8_names and p_val == lowest_top_8_score:
+                        line += f"{RED}{p_str}{RESET}"
+                    elif event in top_8_names:
+                        line += f"{GREEN}{p_str}{RESET}"
+                    else:
+                        line += p_str
                 else:
                     line += f"{'-':>5}"
+                    
             line += f" {int(row['Osallistumiset_yht']):>4} {int(row['Kokonaispisteet']):>5}"
             print(line)
         print("-" * len(v_header))
@@ -215,7 +244,7 @@ def main():
         # 2. TAULUKKO: UUSI PISTELASKU
         u_header = f"{'SIJA':<5} {'PELAAJA':<20} | {event_headers} {'LKM':>4} {'YHT':>5}"
         print("\n" + "=" * len(u_header))
-        print(f" UUSI SÄÄNTÖ (101-1)")
+        print(f" UUSI SÄÄNTÖ (101-1)  ({GREEN}Vihreä = 8 parasta{RESET} | {RED}Punainen = Huonoin laskettava{RESET})")
         print("=" * len(u_header))
         print(u_header)
         print("-" * len(u_header))
@@ -223,18 +252,38 @@ def main():
         for _, row in df_uusi.iterrows():
             u_id = row['UserID']
             line = f"{int(row['SarjaSijoitus']):<5} {row['Nimi'][:20]:<20} | "
+            
+            event_points = {}
             for event in event_names:
                 original_score = df_tulokset.loc[df_tulokset['UserID'] == u_id, event].values[0]
                 if pd.notna(original_score):
-                    line += f"{int(row[f'UudetPisteet: {event}']):>5}"
+                    event_points[event] = float(row[f"UudetPisteet: {event}"])
+            
+            top_8_events = sorted(event_points.items(), key=lambda x: x[1], reverse=True)[:8]
+            top_8_names = [e[0] for e in top_8_events]
+            
+            lowest_top_8_score = min([e[1] for e in top_8_events]) if top_8_events else None
+            
+            for event in event_names:
+                if event in event_points:
+                    p_val = event_points[event]
+                    p_str = f"{int(p_val):>5}"
+                    
+                    if event in top_8_names and p_val == lowest_top_8_score:
+                        line += f"{RED}{p_str}{RESET}"
+                    elif event in top_8_names:
+                        line += f"{GREEN}{p_str}{RESET}"
+                    else:
+                        line += p_str
                 else:
                     line += f"{'-':>5}"
+                    
             line += f" {int(row['Osallistumiset_yht']):>4} {int(row['Kokonaispisteet']):>5}"
             print(line)
         print("-" * len(u_header))
         
     except Exception as e:
         print(f"❌ Virhe: {e}")
-        
+
 if __name__ == "__main__":
     main()
