@@ -32,4 +32,6 @@ cd fgsmh_metrix
 
 # Aja ohjelma (uv asentaa riippuvuudet automaattisesti)
 uv run metrix_laskuri.py
+
+# Onnistuu myös pythonin venv:llä lisäämällä pandas ja openpyxl modulet (esim. pip:lla)
 ```
